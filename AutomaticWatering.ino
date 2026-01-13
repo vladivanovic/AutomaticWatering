@@ -15,10 +15,6 @@
 
 //------------------------------
 
-//BME280
-#define I2C_SCL 5
-#define I2C_SDA 4
-Adafruit_BME280 bme;
 // Screen
 #define SCREEN_WIDTH 128    // OLED display width, in pixels
 #define SCREEN_HEIGHT 32    // OLED display height, in pixels
@@ -52,6 +48,8 @@ char splunkPath[] = "/services/collector/event";
 char splunk_key[] = SPLUNK_KEY;
 // Initialize the HttpClient object once
 HttpClient http(wifi, splunkServerAddress, splunkPort);
+// Photo Resistor Pin
+const int photoresistorPin = A1; // Analog pin connected to the Photoresistor Sensor module
 
 //
 // Setup routine
@@ -104,7 +102,7 @@ void setup() {
 void loop() {
   //Check temperature, humidity, and soil humidity once a minute.
   float temp, hum;
-  int moist;
+  int moist, lightval;
   //
   checkWater();
   delay(10000);
@@ -113,6 +111,9 @@ void loop() {
   delay(10000);
   //
   checkTemp(temp, hum);
+  delay(10000);
+  //
+  checkLight(lightval);
   delay(10000);
   //
   printWifiData();
@@ -130,10 +131,8 @@ void loop() {
   char all_data[256];
   //snprintf(all_data, sizeof(all_data), "Temperature: %.1f, Humidity: %.1f, Soil Moisture: %d", temp, hum, moist);
   snprintf(all_data, sizeof(all_data),
-         "{\"event\":{\"temperature\":%.1f,\"humidity\":%.1f,\"soil_moisture\":%d},\"sourcetype\":\"arduino:autowater\",\"host\":\"ArduinoUnoR4\",\"index\":\"autowater\"}",
-         temp,
-         hum,
-         moist);
+         "{\"event\":{\"temperature\":%.1f,\"humidity\":%.1f,\"soil_moisture\":%d,\"light_value\":%d},\"sourcetype\":\"arduino:autowater\",\"host\":\"ArduinoUnoR4\",\"index\":\"autowater\"}",
+         temp, hum, moist, lightval);
   Serial.println(all_data);
   splunkConnect(all_data);
   delay(10000);
@@ -302,4 +301,17 @@ void splunkConnect(char* requestBody) {
   }
   // No explicit http.stop() needed here as the HttpClient object typically manages the WiFiClient.
   // The connection might be kept alive for subsequent requests or closed by the client library.
+}
+
+// Watering
+void checkLight(int &lightValue) {
+  lightValue = analogRead(photoresistorPin); // Read the analog value from the Photo Resistor
+  Serial.print("Light Intensity: ");
+  Serial.println(lightValue);
+  // Adjust threshold
+  int threshold = 500;
+  if (lightValue < threshold) {
+    // Add some action if we want too
+    Serial.println("It's a little dark.");
+  }
 }
