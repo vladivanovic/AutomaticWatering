@@ -2,9 +2,6 @@
 // Initiate I2C Protocol
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-// Screen
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 // Library for UNO R4 WiFi networking
 #include <WiFiS3.h>
 #include "arduino_secrets.h"
@@ -15,27 +12,13 @@
 
 //------------------------------
 
-// Screen
-#define SCREEN_WIDTH 128    // OLED display width, in pixels
-#define SCREEN_HEIGHT 32    // OLED display height, in pixels
-#define OLED_RESET -1       // Reset pin # (or -1 if sharing Arduino reset pin)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 // Wifi - please enter your sensitive data in the Secret tab/arduino_secrets.h
 char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;        // your network password (use for WPA, or use as key for WEP)
 int status = WL_IDLE_STATUS;     // the WiFi radio's status
-// Ultrasonic Sensor
-int Trig = 8;
-int Echo = 9;
-int Duration;
-float Distance;
-// LED
-int led = 7;
 // Moisture sensor
 int water_count = 0;
 #define THRESHOLD 420 // Higher than 530 = Dry
-// relay
-int relay = 13;
 // Temp Sensor
 #define DHTTYPE 22
 #define DHTPIN 2
@@ -55,14 +38,6 @@ const int photoresistorPin = A1; // Analog pin connected to the Photoresistor Se
 // Setup routine
 void setup() {
   Serial.begin(9600);
-  // Screen
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  //initialize with the I2C addr 0x3C (128x64)
-  display.clearDisplay();
-  display.setTextColor(WHITE);
-  display.setTextSize(1);
-  display.setCursor(25,10);  
-  display.println("Booting up");
-  display.display();
   // Wifi - check for the WiFi module:
   if (WiFi.status() == WL_NO_MODULE) {
     Serial.println("Communication with WiFi module failed!");
@@ -85,13 +60,6 @@ void setup() {
   // you're connected now, so print out the data:
   Serial.println("You're connected to the network");
   printCurrentNet();
-  // Ultrasonic Sensor
-  pinMode(Trig,OUTPUT);
-  pinMode(Echo,INPUT);
-  // LED
-  pinMode(led,OUTPUT);
-  // Relay
-  pinMode(relay, OUTPUT);
   //BME280
   Wire.begin();
   dht.begin();
@@ -104,9 +72,6 @@ void loop() {
   float temp, hum;
   int moist, lightval;
   //
-  checkWater();
-  delay(10000);
-  //
   checkMoisture(moist);
   delay(10000);
   //
@@ -117,16 +82,6 @@ void loop() {
   delay(10000);
   //
   printWifiData();
-  IPAddress ipadd = WiFi.localIP();
-  display.clearDisplay();
-  display.setCursor(25,10);  
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.println("Wifi");
-  display.setCursor(25,20);
-  display.setTextSize(1);
-  display.print(ipadd);
-  display.display();
   // Send to Splunk
   char all_data[256];
   //snprintf(all_data, sizeof(all_data), "Temperature: %.1f, Humidity: %.1f, Soil Moisture: %d", temp, hum, moist);
@@ -153,77 +108,12 @@ void checkTemp(float &temperature, float &humidity){
     }
     temperature = t;       // Temp C
     humidity = h;         // Humidity %
-    display.clearDisplay();
-    display.setCursor(25,10);  
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
-    display.println("Temperature");
-    display.setCursor(25,20);
-    display.setTextSize(1);
-    display.print(t);
-    display.print("C ");
-    display.print(h);
-    display.print("\%");
-    display.display();
-}
-
-// Ultrasonic Sensor
-void checkWater(){
-  //Check the water level in the bucket.
-  digitalWrite(Trig,LOW);
-  delayMicroseconds(1);
-  digitalWrite(Trig,HIGH);
-  delayMicroseconds(11);
-  digitalWrite(Trig,LOW);
-  Duration = pulseIn(Echo,HIGH);
-  if (Duration>0)  {
-    Distance = Duration/2;
-    Distance = Distance*340*100/1000000; // ultrasonic  speed is 340m/s = 34000cm/s = 0.034cm/us 
-    Serial.print(Distance);
-    Serial.println(" cm");
-    display.clearDisplay();
-    display.setCursor(25,10);  
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
-    display.println("Water Level");
-    display.setCursor(25,20);
-    display.setTextSize(1);
-    display.print(Distance);
-    display.display();
-  }
 }
 
 // Moisture sensor
 void checkMoisture(int &moisture){
   // Measure soil humidity
   moisture = analogRead(A0);
-  if(moisture  >= THRESHOLD){
-    digitalWrite(led, HIGH);
-    water_count++;
-    if(water_count == 5){ //To wait for the water to go through the pot.
-      watering();
-      water_count = 0;
-    }
-  } else {
-    digitalWrite(led, LOW);
-  }
-  display.clearDisplay();
-  display.setCursor(25,10);  
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.println("Soil Dryness");
-  display.setCursor(25,20);
-  display.setTextSize(1);
-  display.print(moisture);
-  display.display();
-}
-
-// Watering
-void watering(){
-  digitalWrite(relay, HIGH);
-  delay(2000);
-  digitalWrite(relay, LOW);
-  delay(8000);
 }
 
 // IP Address on Wifi
@@ -303,7 +193,7 @@ void splunkConnect(char* requestBody) {
   // The connection might be kept alive for subsequent requests or closed by the client library.
 }
 
-// Watering
+// Light value
 void checkLight(int &lightValue) {
   lightValue = analogRead(photoresistorPin); // Read the analog value from the Photo Resistor
   Serial.print("Light Intensity: ");
